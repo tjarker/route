@@ -27,8 +27,7 @@ jobs:
       run: |
         git clone https://github.com/tjarker/liftoff.git
         cd liftoff
-        sbt publishLocal
-        sbt "macros/publishLocal"
+        sbt 'publishLocal; macros/publishLocal'
     - name: Setup Verilator
       run: sudo apt-get install verilator
     - name: Run tests
