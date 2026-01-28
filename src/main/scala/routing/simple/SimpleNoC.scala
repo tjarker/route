@@ -6,7 +6,7 @@ import chisel3.util._
 import routing.Direction._
 import routing._
 
-case class SimpleParam[T <: Data](
+case class SimpleNocParams[T <: Data](
   nx: Int, 
   ny: Int, 
   payloadGen: () => T,
@@ -22,7 +22,7 @@ case class SimpleParam[T <: Data](
 
 object SimpleNoC extends App {
 
-  val p = SimpleParam[UInt](
+  val p = SimpleNocParams[UInt](
     nx = 4,
     ny = 4,
     payloadGen = () => UInt(8.W),

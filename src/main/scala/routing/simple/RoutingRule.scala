@@ -74,8 +74,8 @@ object XYRouting extends RoutingPolicy {
     def generateLogic(dest: Destination, here: Coord): Map[Direction, Bool] = {
       val xMatch = dest.x === here.x.U
       Map(
-        East -> (!xMatch && !dest.eastbound),
-        West -> (!xMatch && dest.eastbound),
+        East -> (!xMatch && dest.eastbound),
+        West -> (!xMatch && !dest.eastbound),
         South -> (xMatch && dest.southbound),
         North -> (xMatch && !dest.southbound)
       )

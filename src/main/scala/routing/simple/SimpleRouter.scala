@@ -7,79 +7,64 @@ import routing.{North, South, East, West, Local}
 import chisel3.util.MixedVec
 import routing.Coord
 
-class SimpleRoutingBlock[T <: Data](ingressDir: Direction, coord: Coord)(
-    implicit p: SimpleParam[T]
-) extends Module {
-  val in = IO(Flipped(new PacketPort[T](ingressDir)))
-  val routes = p.routingPolicy
-    .getRule(ingressDir)
-    .generateLogic(in.bits.dest, coord)
-  val out = IO(MixedVec(routes.keys.map(dir => new PacketPort(dir)).toSeq))
-
-  val readies = out.zip(routes.toSeq).map { case (outPort, (dir, shouldRoute)) =>
-    outPort.valid := shouldRoute && in.valid
-    outPort.bits := in.bits
-    shouldRoute && outPort.ready
-  }
-  in.ready := readies.reduce(_ || _)
-  out.foreach(_.bits := in.bits)
-}
-
-class SimpleRouter[T <: Data](coord: Coord)(implicit p: SimpleParam[T])
+class SimpleRouter[T <: Data](coord: Coord)(implicit p: SimpleNocParams[T])
     extends Module {
 
-  val ports = IO(RouterIO())
+  val ports = IO(SimpleRouterIO())
 
-  ports.ingresses.foreach { inPort =>
-    inPort.ready := 1.B
-  }
-
-  ports.egresses.foreach { outPort =>
-    outPort.valid := 0.B
-    outPort.bits := 0.U.asTypeOf(outPort.bits)
-  }
-
-  val buffers = ports.ingresses.map( port =>
+  // create buffers for all 5 ingress ports
+  val buffers = ports.ingresses.map(port =>
     p.bufferFactory(port, depth = 4).suggestName(s"buffer_${port.dir}")
   )
 
+  // connect ingress ports to buffers
   val buffedIngresses = ports.ingresses.zip(buffers).map { case (port, buf) =>
     port <> buf.enq
     buf.deq
   }
 
+  // create routing blocks for all buffered ingress ports and collect their fanout
   val ingressFanout = buffedIngresses.flatMap { bufOut =>
     val routingBlock = Module(new SimpleRoutingBlock[T](bufOut.dir, coord))
     routingBlock.in <> bufOut
     routingBlock.out
   }
 
+  // group requests by egress direction
   val egressRequests = ingressFanout.groupBy(_.dir)
 
+  // create arbiters for each egress direction and connect them to the egress ports
   egressRequests.foreach { case (dir, reqPorts) =>
-    val arbiter = p.arbiterFactory(dir, reqPorts.length).suggestName(s"arbiter_${dir}")
-    reqPorts.zip(arbiter.in).foreach { case (reqPort, arbIn) =>
-      arbIn <> reqPort
-    }
+    val arbiter = p // create arbiter
+      .arbiterFactory(dir, reqPorts.length)
+      .suggestName(s"arbiter_${dir}")
+    reqPorts // connect requests to arbiter inputs
+      .zip(arbiter.in)
+      .foreach { case (reqPort, arbIn) =>
+        arbIn <> reqPort
+      }
+    // connect arbiter output to egress port
     ports(dir).egress <> arbiter.out
   }
 
 }
 
-class RouterPort[T <: Data](val dir: Direction)(implicit p: SimpleParam[T])
-    extends Bundle {
+class SimpleRouterPort[T <: Data](val dir: Direction)(implicit
+    p: SimpleNocParams[T]
+) extends Bundle {
   val ingress = Flipped(new PacketPort[T](dir)).suggestName(s"ingress_${dir}")
   val egress = new PacketPort[T](dir).suggestName(s"egress_${dir}")
 }
-class RouterIO[T <: Data](implicit p: SimpleParam[T]) extends Bundle {
-  val north = new RouterPort[T](North)
-  val south = new RouterPort[T](South)
-  val east = new RouterPort[T](East)
-  val west = new RouterPort[T](West)
-  val local = new RouterPort[T](Local)
 
-  def all: Seq[RouterPort[T]] = Seq(north, east, south, west, local)
-  def apply(dir: Direction): RouterPort[T] = dir match {
+class SimpleRouterIO[T <: Data](implicit p: SimpleNocParams[T]) extends Bundle {
+  val north = new SimpleRouterPort[T](North)
+  val south = new SimpleRouterPort[T](South)
+  val east = new SimpleRouterPort[T](East)
+  val west = new SimpleRouterPort[T](West)
+  val local = new SimpleRouterPort[T](Local)
+
+  def all: Seq[SimpleRouterPort[T]] = Seq(north, east, south, west, local)
+  def apply(dir: Direction): SimpleRouterPort[T] = dir match {
     case North => north
     case East  => east
     case South => south
@@ -89,8 +74,9 @@ class RouterIO[T <: Data](implicit p: SimpleParam[T]) extends Bundle {
   def ingresses: Seq[PacketPort[T]] = all.map(_.ingress)
   def egresses: Seq[PacketPort[T]] = all.map(_.egress)
 }
-object RouterIO {
-  def apply[T <: Data]()(implicit p: SimpleParam[T]): RouterIO[T] = {
-    new RouterIO[T]
+
+object SimpleRouterIO {
+  def apply[T <: Data]()(implicit p: SimpleNocParams[T]): SimpleRouterIO[T] = {
+    new SimpleRouterIO[T]
   }
 }
