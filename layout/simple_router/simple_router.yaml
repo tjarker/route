@@ -1,0 +1,14 @@
+DESIGN_NAME: SimpleRouter
+FP_PDN_MULTILAYER: false
+VERILOG_FILES:
+  - ../../generated/SimpleRouter.v
+CLOCK_PORT: clock
+CLOCK_PERIOD: 10
+FP_CORE_UTIL: 50
+FP_PIN_ORDER_CFG: pin_order.cfg
+PNR_SDC_FILE: ports_constraints.sdc
+SIGNOFF_SDC_FILE: ports_constraints.sdc
+STA_CORNERS:
+ - nom_tt_025C_1v80
+ - min_tt_025C_1v80
+ - max_tt_025C_1v80

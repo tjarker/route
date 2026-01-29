@@ -5,6 +5,7 @@ import chisel3.util._
 import chisel3.experimental.BundleLiterals._
 
 import routing.Direction
+import routing.PacketPortLike
 
 class Destination(implicit p: SimpleNocParams[_]) extends Bundle {
   val x = p.xCoordType
@@ -32,4 +33,7 @@ object SimplePacket {
   }
 }
 
-class PacketPort[T <: Data](val dir: Direction)(implicit p: SimpleNocParams[T]) extends DecoupledIO(new SimplePacket[T])
+class PacketPort[T <: Data](val dir: Direction)(implicit p: SimpleNocParams[T]) extends DecoupledIO(new SimplePacket[T]) with PacketPortLike {
+  type P = SimplePacket[T]
+  def chisel: DecoupledIO[P] = this
+}

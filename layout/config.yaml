@@ -1,8 +1,0 @@
-DESIGN_NAME: SimpleRouter
-FP_PDN_MULTILAYER: false
-VERILOG_FILES:
-  - ../generated/SimpleRouter.v
-CLOCK_PORT: clock
-CLOCK_PERIOD: 10
-FP_CORE_UTIL: 40
-FP_PIN_ORDER_CFG: pin_order.cfg

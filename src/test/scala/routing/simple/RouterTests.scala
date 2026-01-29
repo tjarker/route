@@ -24,6 +24,14 @@ class DecoupledProducer[T <: Data](port: DecoupledIO[T], clock: Clock) {
 }
 
 class DecoupledConsumer[T <: Data](port: DecoupledIO[T], clock: Clock) {
+  def receive(): T = {
+    port.ready.poke(1.B)
+    clock.stepUntil(port.valid, 1.B, maxCycles = 100)
+    val received = port.bits.peek()
+    clock.step() // commit handshake
+    port.ready.poke(0.B)
+    received
+  }
   def expect(expected: T): Unit = {
     port.ready.poke(1.B)
     clock.stepUntil(port.valid, 1.B, maxCycles = 100)

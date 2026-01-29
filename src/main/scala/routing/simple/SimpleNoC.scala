@@ -20,28 +20,28 @@ case class SimpleNocParams[T <: Data](
   def yCoordType: UInt = UInt(log2Ceil(ny).W)
 }
 
-object SimpleNoC extends App {
+class SimpleRouterFactory[T <: Data](p: SimpleNocParams[T]) extends RouterFactory {
+  override def createRouter(coord: Coord): RouterLike = {
+    Module(new SimpleRouter[T](coord)(p)).suggestName(s"router_${coord.x}_${coord.y}")
+  }
+}
+
+object SimpleNoc extends App {
 
   val p = SimpleNocParams[UInt](
     nx = 4,
     ny = 4,
-    payloadGen = () => UInt(8.W),
+    payloadGen = () => UInt(32.W),
     bufferFactory = SimpleBuffer,
     arbiterFactory = ChiselArbiter,
     routingPolicy = XYRouting
   )
-  emitVerilog(new SimpleRouter[UInt](Coord(2,2))(p), Array("--target-dir", "generated"))
+  //emitVerilog(new SimpleRouter[UInt](Coord(2,2))(p), Array("--target-dir", "generated"))
+
+  emitVerilog(
+    NocBuilder.build(new SimpleRouterPort[UInt](Local)(p), new TorusBuilder(2,2), new SimpleRouterFactory[UInt](p)),
+    Array("--target-dir", "generated")
+  )
 }
 
 
-
-abstract class FlowModule[I <: Data, DI <: DecoupledIO[I], O <: Data, DO <: DecoupledIO[O]](decI: DI, decO: DO) extends Module {
-  val flow = IO(new Bundle {
-    val in = Flipped(decI)
-    val out = decO
-  })
-
-  def <>: (that: FlowModule[I, DI, _, _]): Unit = {
-    this.flow.out <> that.flow.in
-  }
-}

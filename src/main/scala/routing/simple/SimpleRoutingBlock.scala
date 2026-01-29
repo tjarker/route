@@ -5,6 +5,9 @@ import routing.Direction
 import routing.{North, South, East, West, Local}
 import chisel3.util.MixedVec
 import routing.Coord
+import scala.collection.immutable.SeqMap
+
+
 
 class SimpleRoutingBlock[T <: Data](ingressDir: Direction, coord: Coord)(
     implicit p: SimpleNocParams[T]
@@ -13,13 +16,31 @@ class SimpleRoutingBlock[T <: Data](ingressDir: Direction, coord: Coord)(
   val routes = p.routingPolicy
     .getRule(ingressDir)
     .generateLogic(in.bits.dest, coord)
-  val out = IO(MixedVec(routes.keys.map(dir => new PacketPort(dir)).toSeq))
 
-  val readies = out.zip(routes.toSeq).map { case (outPort, (dir, shouldRoute)) =>
-    outPort.valid := shouldRoute && in.valid
-    outPort.bits := in.bits
-    shouldRoute && outPort.ready
+  val to = IO(new DirectionBundle[T](routes.keys.toSeq))
+
+  val shouldRoute = dontTouch(VecInit(routes.values.toSeq))
+
+  val readies = routes.map { case (dir, shouldRoute) =>
+    to(dir).valid := shouldRoute && in.valid
+    to(dir).bits := in.bits
+    shouldRoute && to(dir).ready
   }
   in.ready := readies.reduce(_ || _)
-  out.foreach(_.bits := in.bits)
+  to.all.foreach(_.bits := in.bits)
+}
+
+class DirectionBundle[T <: Data](val directions: Seq[Direction])(implicit p: SimpleNocParams[T]) extends Record {
+
+  val map = SeqMap(directions.map(dir => dir -> new PacketPort[T](dir)):_*)
+  override def elements: SeqMap[String,Data] = SeqMap(map.toSeq.map { case (dir, signal) => dir.toString -> signal }:_*)
+  def apply(dir: Direction): PacketPort[T] = this.map(dir)
+  def all: Seq[PacketPort[T]] = map.values.toIndexedSeq
+
+  def <>(that: DirectionBundle[T]): Unit = {
+    require(this.directions.toSet == that.directions.toSet, "DirectionBundles must have the same directions to connect")
+    for (dir <- directions) {
+      this(dir) <> that(dir)
+    }
+  }
 }
