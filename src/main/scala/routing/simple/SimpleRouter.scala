@@ -19,7 +19,7 @@ class SimpleRouter[T <: Data](val coord: Coord)(implicit p: SimpleNocParams[T])
 
   // create buffers for all 5 ingress ports
   val buffers = ports.ingresses.map(port =>
-    p.bufferFactory(port, depth = 4).suggestName(s"buffer_${port.dir}")
+    p.bufferFactory(port, depth = 2).suggestName(s"buffer_${port.dir}")
   )
 
   // connect ingress ports to buffers

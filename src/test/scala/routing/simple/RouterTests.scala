@@ -6,43 +6,9 @@ import liftoff._
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 import routing._
-import liftoff.misc.WorkingDirectory
 
-class DecoupledProducer[T <: Data](port: DecoupledIO[T], clock: Clock) {
-  def send(data: T): Unit = {
-    val oldValue = port.bits.peek()
-    port.bits.poke(data)
-    port.valid.poke(1.B)
-    clock.stepUntil(port.ready, 1.B, maxCycles = 100)
-    clock.step() // commit handshake
-    port.valid.poke(0.B)
-    port.bits.poke(oldValue)
-  }
-  def send(data: Seq[T]): Unit = {
-    data.foreach(send)
-  }
-}
 
-class DecoupledConsumer[T <: Data](port: DecoupledIO[T], clock: Clock) {
-  def receive(): T = {
-    port.ready.poke(1.B)
-    clock.stepUntil(port.valid, 1.B, maxCycles = 100)
-    val received = port.bits.peek()
-    clock.step() // commit handshake
-    port.ready.poke(0.B)
-    received
-  }
-  def expect(expected: T): Unit = {
-    port.ready.poke(1.B)
-    clock.stepUntil(port.valid, 1.B, maxCycles = 100)
-    port.bits.expect(expected)
-    clock.step() // commit handshake
-    port.ready.poke(0.B)
-  }
-  def expect(expected: Seq[T]): Unit = {
-    expected.foreach(expect)
-  }
-}
+
 
 class RouterTests extends AnyWordSpec with Matchers {
 
@@ -75,12 +41,12 @@ class RouterTests extends AnyWordSpec with Matchers {
       Task.scope {
         for ((dir, packets) <- sendPackets) yield Task {
           val producer =
-            new DecoupledProducer(dut.ports(dir).ingress, dut.clock)
-          producer.send(packets)
+            new nocbench.DecoupledProducer(dut.ports(dir).ingress, dut.clock)
+          producer.sendAll(packets)
         }
         for ((dir, packets) <- expectedPackets) yield Task {
-          val consumer = new DecoupledConsumer(dut.ports(dir).egress, dut.clock)
-          consumer.expect(packets)
+          val consumer = new nocbench.DecoupledConsumer(dut.ports(dir).egress, dut.clock)
+          consumer.expectAll(packets)
         }
       }
     }
