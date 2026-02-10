@@ -12,6 +12,7 @@ trait PacketPortLike {
 trait RouterPortLike {
   type P <: Data
   def dir: Direction
+  def coord: Coord
   def ingressPort: PacketPortLike
   def egressPort: PacketPortLike
   def chisel: Bundle {

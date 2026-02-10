@@ -33,6 +33,26 @@ package object librelane {
     results.head
   }
 
+  def compareChisel(gens: Seq[() => chisel3.Module], dir: WorkingDirectory, params: JObject): Map[String, AwaitableResult] = {
+    val results = gens.map { gen =>
+      val m = liftoff.chisel.ChiselBridge.elaborate(gen())
+      val designDir = dir.addSubDir(dir / m.name)
+      val verilogFile = designDir / s"${m.name}.v"
+      emitVerilog(gen(), Array("--target-dir", designDir.dir.getAbsolutePath()))
+      val updatedParams = params merge JObject(
+        JField("VERILOG_FILES", JArray(List(JString(verilogFile.getAbsolutePath())))),
+        JField("DESIGN_NAME", JString(m.name)),
+        JField("CLOCK_PORT", JString("clock")),
+      )
+      val res = explore(designDir, updatedParams)
+      if (res.size != 1) {
+        throw new Exception(s"CompareChisel expected a single configuration for ${m.name}, but got ${res.size}")
+      }
+      (m.name, res.head)
+    }.toMap
+    results
+  }
+
   def explore(dir: WorkingDirectory, params: JObject): Seq[AwaitableResult] = {
 
 
@@ -85,6 +105,11 @@ package object librelane {
     def warnings(): Seq[FailureReason] = this match {
       case s: SuccessfulRun       => Seq()
       case f: FailedRun     => f.reasons
+    }
+    def areaDelayTable(): String = {
+      liftoff.Reporting.table(
+        Seq(Seq("Area (um^2)", "Critical Path (ns)"), Seq(coreArea, criticalPath1v80))
+      )
     }
   }
   case class SuccessfulRun(corners: Seq[TimingCorner], metrics: JValue) extends RunResult

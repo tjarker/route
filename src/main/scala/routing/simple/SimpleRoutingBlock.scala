@@ -35,7 +35,7 @@ class DirectionBundle[T <: Data](val directions: Seq[Direction])(implicit p: Sim
   val map = SeqMap(directions.map(dir => dir -> new PacketPort[T](dir)):_*)
   override def elements: SeqMap[String,Data] = SeqMap(map.toSeq.map { case (dir, signal) => dir.toString -> signal }:_*)
   def apply(dir: Direction): PacketPort[T] = this.map(dir)
-  def all: Seq[PacketPort[T]] = map.values.toIndexedSeq
+  def all: Seq[PacketPort[T]] = directions.map(map)
 
   def <>(that: DirectionBundle[T]): Unit = {
     require(this.directions.toSet == that.directions.toSet, "DirectionBundles must have the same directions to connect")

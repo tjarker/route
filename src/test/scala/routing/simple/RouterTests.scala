@@ -16,7 +16,7 @@ class RouterTests extends AnyWordSpec with Matchers {
     nx = 4,
     ny = 4,
     payloadGen = () => UInt(32.W),
-    bufferFactory = SimpleBuffer,
+    bufferFactory = ChiselQueueBuffer,
     arbiterFactory = ChiselArbiter,
     routingPolicy = XYRouting
   )

@@ -16,14 +16,14 @@ class SimpleNocTest extends AnyWordSpec with Matchers {
       nx = 2,
       ny = 2,
       payloadGen = () => UInt(32.W),
-      bufferFactory = SimpleBuffer,
+      bufferFactory = ChiselQueueBuffer,
       arbiterFactory = ChiselArbiter,
       routingPolicy = XYRouting
     )
 
     Reporting.setOutput(Reporting.NullStream)
     val model = ChiselModel(
-      NocBuilder.build(new SimpleRouterPort[UInt](Local)(params), new MeshBuilder(params.nx, params.ny), new SimpleRouterFactory[UInt](params)),
+      NocBuilder.build(new SimpleRouterPort[UInt](Coord(1,1), Local)(params), new MeshBuilder(params.nx, params.ny), new SimpleRouterFactory[UInt](params)),
       "build/noc-model".toDir
     )
 

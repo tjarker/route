@@ -25,6 +25,17 @@ case class SimpleNocParams[T <: Data](
   def yCoordType: UInt = UInt(log2Ceil(ny).W)
 }
 
+object SimpleNocParams {
+  def default: SimpleNocParams[UInt] = SimpleNocParams[UInt](
+    nx = 4,
+    ny = 4,
+    payloadGen = () => UInt(32.W),
+    bufferFactory = ChiselQueueBuffer,
+    arbiterFactory = ChiselArbiter,
+    routingPolicy = XYRouting
+  )
+}
+
 class SimpleRouterFactory[T <: Data](p: SimpleNocParams[T]) extends RouterFactory {
   override def createRouter(coord: Coord): RouterLike = {
     Module(new SimpleRouter[T](coord)(p)).suggestName(s"router_${coord.x}_${coord.y}")
@@ -51,33 +62,49 @@ object SimpleNoc extends App {
 
   }
 
-  val p = SimpleNocParams[UInt](
-    nx = 4,
-    ny = 4,
-    payloadGen = () => UInt(32.W),
-    bufferFactory = SimpleBuffer,
-    arbiterFactory = ChiselArbiter,
-    routingPolicy = XYRouting
+  
+
+  val bufferFactory = SingleRegBuffer
+
+  val p = SimpleNocParams.default.copy(
+    bufferFactory = bufferFactory
   )
 
-  val dir = "build/libre-harden-simple-noc".toDir
+  val routerFactory = () => new SimpleRouter(Coord(2,2))(p)
 
-  val chiselDir = dir.addSubDir(dir / "chisel")
+  val dir = "build/libre-harden-router".toDir
 
-  val resChiselRun = evalRouter(new SimpleRouter(Coord(2,2))(p), chiselDir)
+  val runner = evalRouter(routerFactory(), dir)
 
-  val customBufferDir = dir.addSubDir(dir / "custom_buffer")
+  val res = runner.await()
 
-  val customBufferRun = evalRouter(new SimpleRouter(Coord(2,2))(p.copy(bufferFactory = DoubleRegBuffer)), customBufferDir)
+  dir.addFile(s"result.json", prettyRender(res.metrics))
 
-  val resChiselBuf = resChiselRun.await()
-  val customBufferRes = customBufferRun.await()
-
-  dir.addFile(s"chiselbuf-result.json", prettyRender(resChiselBuf.metrics))
-
-  dir.addFile(s"custombuf-result.json", prettyRender(customBufferRes.metrics))
+  println(res.areaDelayTable())
 
   
 }
 
 
+object BufferCompare extends App {
+
+  val p = SimpleNocParams[UInt](
+    nx = 4,
+    ny = 4,
+    payloadGen = () => UInt(32.W),
+    bufferFactory = ChiselQueueBuffer,
+    arbiterFactory = ChiselArbiter,
+    routingPolicy = XYRouting
+  )
+
+  val buf1 = librelane.hardenChisel(new DoubleRegBuffer[UInt](new PacketPort[UInt](Local)(p))(p), "build/libre-harden-double-reg-buffer".toDir, JObject(
+    JField("CLOCK_PERIOD", JDouble(10.0))
+  ))
+  val buf2 = librelane.hardenChisel(new OptimizedDoubleRegBuffer[UInt](new PacketPort[UInt](Local)(p))(p), "build/libre-harden-double-buffer-reg2".toDir, JObject(
+    JField("CLOCK_PERIOD", JDouble(10.0))
+  ))
+
+
+  buf1.await()
+  buf2.await()
+}

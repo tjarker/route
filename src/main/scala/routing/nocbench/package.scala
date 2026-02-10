@@ -3,38 +3,47 @@ package routing
 package object nocbench {
 
   import chisel3._
+  import chisel3.util._
 
   case class NocTx(
-    ingressId: Int,
-    egressId: Int,
+    ingress: Coord,
+    egress: Coord,
     payload: BigInt,
     waitCycles: Int
   )
 
   trait NocTxReceipt {
-    def ingressId: Int
-    def egressId: Int
+    def ingress: Coord
+    def egress: Coord
     def payload: BigInt
     def cycle: Int
   }
 
   case class NocSendReceipt(
-    ingressId: Int,
-    egressId: Int,
+    ingress: Coord,
+    egress: Coord,
     payload: BigInt,
     cycle: Int
   ) extends NocTxReceipt
 
   case class NocRecvReceipt(
-    ingressId: Int,
-    egressId: Int,
+    ingress: Coord,
+    egress: Coord,
     payload: BigInt,
     cycle: Int
   ) extends NocTxReceipt
 
+
+  trait NocPortBfmFactory {
+    def createBfm[P <: Data](here: Coord, p: Bundle {
+    val ingress: DecoupledIO[P]
+    val egress: DecoupledIO[P]
+  }): NocPortBfm
+  }
   
 
   trait NocPortBfm {
+    def coord: Coord
     def sendIngress(tx: NocTx): NocSendReceipt
     def observeIngress(): NocSendReceipt
     def receiveEgress(): NocRecvReceipt

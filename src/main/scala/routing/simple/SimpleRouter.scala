@@ -15,11 +15,11 @@ class SimpleRouter[T <: Data](val coord: Coord)(implicit p: SimpleNocParams[T])
   
   type P = SimplePacket[T]
 
-  val ports = IO(SimpleRouterIO())
+  val ports = IO(SimpleRouterIO(coord))
 
   // create buffers for all 5 ingress ports
   val buffers = ports.ingresses.map(port =>
-    p.bufferFactory(port, depth = 2).suggestName(s"buffer_${port.dir}")
+    p.bufferFactory(port, depth = 1).suggestName(s"buffer_${port.dir}")
   )
 
   // connect ingress ports to buffers
@@ -61,7 +61,7 @@ class SimpleRouter[T <: Data](val coord: Coord)(implicit p: SimpleNocParams[T])
 
 case class PacketInTransit[T <: Data](packetPort: PacketPort[T], from: Direction, to: Direction)
 
-class SimpleRouterPort[T <: Data](val dir: Direction)(implicit
+class SimpleRouterPort[T <: Data](val coord: Coord, val dir: Direction)(implicit
     p: SimpleNocParams[T]
 ) extends Bundle with RouterPortLike {
   type P = SimplePacket[T]
@@ -74,12 +74,12 @@ class SimpleRouterPort[T <: Data](val dir: Direction)(implicit
   def chisel = this
 }
 
-class SimpleRouterIO[T <: Data](implicit p: SimpleNocParams[T]) extends Bundle {
-  val north = new SimpleRouterPort[T](North)
-  val south = new SimpleRouterPort[T](South)
-  val east = new SimpleRouterPort[T](East)
-  val west = new SimpleRouterPort[T](West)
-  val local = new SimpleRouterPort[T](Local)
+class SimpleRouterIO[T <: Data](val coord: Coord)(implicit p: SimpleNocParams[T]) extends Bundle {
+  val north = new SimpleRouterPort[T](coord, North)
+  val south = new SimpleRouterPort[T](coord, South)
+  val east = new SimpleRouterPort[T](coord, East)
+  val west = new SimpleRouterPort[T](coord, West)
+  val local = new SimpleRouterPort[T](coord, Local)
 
   def all: Seq[SimpleRouterPort[T]] = Seq(north, east, south, west, local)
   def apply(dir: Direction): SimpleRouterPort[T] = dir match {
@@ -94,7 +94,7 @@ class SimpleRouterIO[T <: Data](implicit p: SimpleNocParams[T]) extends Bundle {
 }
 
 object SimpleRouterIO {
-  def apply[T <: Data]()(implicit p: SimpleNocParams[T]): SimpleRouterIO[T] = {
-    new SimpleRouterIO[T]
+  def apply[T <: Data](coord: Coord)(implicit p: SimpleNocParams[T]): SimpleRouterIO[T] = {
+    new SimpleRouterIO[T](coord)
   }
 }
