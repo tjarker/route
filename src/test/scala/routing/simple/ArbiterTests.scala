@@ -77,4 +77,12 @@ class ArbiterTests extends AnyWordSpec with Matchers {
     testArbiter(new MaskedPriorityArbiter[UInt](Local, Seq(North, South, East, West)), "build/arbiter_tests/masked_priority".toDir)
   }
 
+  "TdmArbiter should arbitrate correctly" in {
+    testArbiter(new TdmArbiter[UInt](Local, Seq(North, South, East, West)), "build/arbiter_tests/tdm".toDir)
+  }
+
+  "TdmOnehotArbiter should arbitrate correctly" in {
+    testArbiter(new TdmOnehotArbiter[UInt](Local, Seq(North, South, East, West)), "build/arbiter_tests/tdm_one_hot".toDir)
+  }
+
 }

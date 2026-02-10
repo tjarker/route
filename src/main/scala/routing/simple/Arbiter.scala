@@ -168,6 +168,12 @@ class MaskedPriorityArbiter[T <: Data](egressDir: Direction, ingresses: Seq[Dire
 
 }
 
+object MaskedPriorityArbiter extends ArbiterFactory {
+  override def apply[T <: Data](egressDir: Direction, ingresses: Seq[Direction])(implicit p: SimpleNocParams[T]): Arbiter[T] = {
+    Module(new MaskedPriorityArbiter[T](egressDir, ingresses))
+  }
+}
+
 class TdmArbiter[T <: Data](egressDir: Direction, ingresses: Seq[Direction])(implicit p: SimpleNocParams[T]) extends Arbiter[T](egressDir, ingresses) {
   val from = IO(Flipped(new DirectionBundle(ingresses)))
   val out = IO(new PacketPort[T](egressDir))
@@ -202,6 +208,39 @@ object TdmArbiter extends ArbiterFactory {
   }
 }
 
+class TdmOnehotArbiter[T <: Data](egressDir: Direction, ingresses: Seq[Direction])(implicit p: SimpleNocParams[T]) extends Arbiter[T](egressDir, ingresses) {
+  val from = IO(Flipped(new DirectionBundle(ingresses)))
+  val out = IO(new PacketPort[T](egressDir))
+
+  require(isPow2(ingresses.length), s"TdmOnehotArbiter requires number of ingresses to be a power of 2, got ${ingresses.length}")
+
+  val counterReg = RegInit(1.U(ingresses.length.W))
+
+  when(out.fire) {
+    counterReg := counterReg(ingresses.length - 1, 0) ## counterReg(ingresses.length - 1)
+  }
+
+  val grantVec = counterReg.asBools
+
+  grantVec.zip(from.all).foreach { case (g, ingress) =>
+    ingress.ready := g && out.ready
+  }
+
+  val masked = from.all.zip(grantVec).map { case (req, g) =>
+    req.bits.asUInt & Fill(out.bits.getWidth, g)
+  }
+
+  out.valid := VecInit(from.all.map(_.valid)).reduceTree(_ || _)
+  out.bits := VecInit(masked).reduceTree(_ | _).asTypeOf(out.bits)
+  
+}
+
+object TdmOnehotArbiter extends ArbiterFactory {
+  override def apply[T <: Data](egressDir: Direction, ingresses: Seq[Direction])(implicit p: SimpleNocParams[T]): Arbiter[T] = {
+    Module(new TdmOnehotArbiter[T](egressDir, ingresses))
+  }
+}
+
 object ArbiterComparison extends App {
   import routing._
   import liftoff.pathToFileOps  
@@ -221,7 +260,8 @@ object ArbiterComparison extends App {
       () => new MaskedPriorityArbiter(Local, Seq(North, South, East, West)),
       () => new TdmArbiter(Local, Seq(North, South, East, West)),
       () => new MartinArbiterTree[SimplePacket[UInt]](4, new SimplePacket[UInt]),
-      () => new MartinArbiterSimpleTree[SimplePacket[UInt]](4, new SimplePacket[UInt])
+      () => new MartinArbiterSimpleTree[SimplePacket[UInt]](4, new SimplePacket[UInt]),
+      () => new TdmOnehotArbiter(Local, Seq(North, South, East, West))
     ),
     dir = dir, 
     params = JObject(
@@ -237,7 +277,7 @@ object ArbiterComparison extends App {
     val area = r.coreArea
     val delay = r.criticalPath1v80
     Seq(name, area, delay)
-  }
+  }.toSeq.sortBy(_(1).asInstanceOf[Double])
 
   val table = liftoff.misc.Reporting.table(Seq(Seq("Arbiter Type", "Area", "Critical Path Delay")) ++ results)
   

@@ -46,7 +46,8 @@ object SimpleNoc extends App {
 
   def evalRouter[T <: Data](noc: => SimpleRouter[T], dir: WorkingDirectory): librelane.AwaitableResult = {
 
-    val sdcFile = "layout/simple_router/ports_constraints.sdc".toFile
+    //val sdcFile = "layout/simple_router/ports_constraints.sdc".toFile
+    val sdcFile = "dummy_constraints.sdc".toFile
     val pinFile = "layout/simple_router/pin_order.cfg".toFile
 
     val res = librelane.hardenChisel(noc, dir, JObject(
@@ -65,9 +66,11 @@ object SimpleNoc extends App {
   
 
   val bufferFactory = SingleRegBuffer
+  val arbiterFactory = MaskedPriorityArbiter
 
   val p = SimpleNocParams.default.copy(
-    bufferFactory = bufferFactory
+    bufferFactory = bufferFactory,
+    arbiterFactory = arbiterFactory
   )
 
   val routerFactory = () => new SimpleRouter(Coord(2,2))(p)
